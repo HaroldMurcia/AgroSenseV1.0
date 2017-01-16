@@ -1,4 +1,11 @@
-// Universidad de Ibagué
+//Universidad de Ibagué
+//Semillero de Investigación SI2C - Grupo D+TEC
+//Proyecto: AgroSensor
+//
+//This file corresponds to the software of an agro-meteorological 
+//station which sense some variables in a crop and transmit 
+//the information via Xbee to a collector node.
+
 
 #include <SoftwareSerial.h>
 SoftwareSerial Xbee(15, 14);//(RX, TX)
@@ -12,10 +19,6 @@ DallasTemperature DS18B20(&oneWire_in);              //--->Sonda DS18B20
 #include "SI114X.h"         //--->Sensor IF,UV,VIS
 #include "RTClib.h"         //--->Reloj
 #include "TSL2561.h"        //--->Flora Light
-
-
-
-
 
 SI114X SI1145 = SI114X();    
 SHT1x sht1x(41,39); //------(dataPin, clockPin)
@@ -154,21 +157,26 @@ void SondaDS18B20(){
 }
 
 void granada(){
-  digitalWrite(53,HIGH);
-  delay(250); 
-  V1 = analogRead(11);
-  Serial.print(V1);Serial.print(" ");  
+  float Vin,Vo;
+  digitalWrite(52,HIGH);
   digitalWrite(53, LOW);  
-  delay(250); 
-  digitalWrite(52, HIGH);
-  delay(250); 
-  V2 = analogRead(10);
-    Serial.print(V2);Serial.print(" ");
-  digitalWrite(52, LOW);   
-  //res = (4700*(V1-V2)/V2); 
-  //Serial.print(res);Serial.print(" ");
-  Xbee.print("200ss-humidity="); Xbee.print(res);Xbee.print(";");
-  delay(500);     
+  delay(1); 
+  Vin = analogRead(10);
+  Vo = analogRead(11);
+  res=4700*(Vin/Vo-1);
+
+  digitalWrite(52,LOW);
+  digitalWrite(53, HIGH); 
+  delay(1);
+  Vin = analogRead(11);
+  Vo = analogRead(10);
+  res=(res+4700*(Vin/Vo-1))/2.0;  
+
+  digitalWrite(52,LOW);
+  digitalWrite(53, LOW); 
+  
+  Serial.print(res);Serial.print(" ");
+  Xbee.print("200ss-humidity="); Xbee.print(res);Xbee.print(";");    
 }
 
 void Bateria(){
