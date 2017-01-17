@@ -26,10 +26,12 @@ RTC_DS1307 rtc;
 TSL2561 tsl(TSL2561_ADDR_FLOAT);  
 
 
-int Anio,Mes,Dia,Hora,Min,FV,FI,FL,SIV,SII,V1,V2,PT1,Hj,Bat,value;
+int Anio,Mes,Dia,Hora,Min,FV,FI,FL,SIV,SII,V1,V2,PT1,Hj,Bat;
 float DS18,SHT,SHH,SIU,res,P1,P2,TP1,TP2,PT,millivolts,celsius;
 char  daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const int chipSelect = 10;
+float ElapsedTime,tic,toc;
+float const Ts=10000;
 //------------Main-----------------//
 void setup(){
   Xbee.begin(9600);
@@ -43,11 +45,11 @@ void setup(){
   pinMode(9, OUTPUT);//digitalWrite(9, HIGH);
   pinMode(10, OUTPUT);//digitalWrite(10, HIGH);
   pinMode(23, OUTPUT);//digitalWrite(23, HIGH);
-  pinMode(24, OUTPUT);//digitalWrite(24, HIGH);//LED
+  pinMode(24, OUTPUT);//digitalWrite(24, HIGH);//LED 1
   pinMode(25, OUTPUT);//digitalWrite(25, HIGH);
-  pinMode(26, OUTPUT);//digitalWrite(26, HIGH);//LED
+  pinMode(26, OUTPUT);//digitalWrite(26, HIGH);//LED 2 
   pinMode(27, OUTPUT);//digitalWrite(27, HIGH);
-  pinMode(29, OUTPUT);//digitalWrite(29, HIGH);
+  pinMode(29, OUTPUT);//digitalWrite(29, HIGH); // LM35
   pinMode(30, OUTPUT);//digitalWrite(30, HIGH);   
   pinMode(31, OUTPUT);//digitalWrite(31, HIGH);
   pinMode(32, OUTPUT);//BOTON
@@ -59,8 +61,9 @@ void setup(){
   pinMode(50, OUTPUT);//digitalWrite(50, HIGH);
   pinMode(53, OUTPUT);//200SS
   pinMode(52, OUTPUT);//200ss
-  ledsON();
-  Serial.begin(9600);                     //--->Inicia Com Serial 9600 
+  
+  SwON();
+  Serial.begin(57600);                     //--->Inicia Com Serial 9600 
   DS18B20.begin();                        //--->Inicia Sonda DS18B20 
   SI1145.Begin();                         //--->Inicia Sensor IF,UV,Vis
   while (!SI1145.Begin()) {//Serial.println("Si1145 is not ready!");
@@ -69,24 +72,49 @@ void setup(){
   tsl.begin();                            //--->Inicia Flora light
   tsl.setGain(TSL2561_GAIN_16X);                  //--->Conf Flora light
   tsl.setTiming(TSL2561_INTEGRATIONTIME_101MS);   //--->Conf Flora light
-  ledsOFF();
+  SwOFF();
+  delay(100);
+  SwON();
+  delay(300);
+  SwOFF();
+  delay(200);
+  SwON();
+  delay(500);
 }
+
+//////////////////////// Main Loop
 void loop(){
-  ledsON();
-  delay(1000);
+  tic=millis();
+  
+  SwON();
+  delay(500);
   Reloj();          //--->Reloj
   Si1145();         //--->Sensor IF,UV,VIS  
   Flora();          //--->Sensor Flora  
   Sht10();          //--->Sensor Tem,Hum
   Pt100();          //--->Sonda Pt100
   SondaDS18B20();   //--->Sonda Ds18B20  
-  granada();
   Bateria();
   Hoja(); 
   lm35(); 
-  ledsOFF();
-  delay(10000);
+  SoilWater(celsius);
+  SwOFF();
+  
+
+  // SampleTime measurement
+  toc=millis();
+  ElapsedTime=(toc-tic);
+  while(ElapsedTime<Ts){
+    toc=millis();
+    ElapsedTime=(toc-tic);
+  }
+  Serial.print("dTime:");
+  Serial.println(ElapsedTime/1000.0);
 }
+
+
+/// Functions
+
 void Reloj(){
  rtc.adjust(DateTime(2017, 1, 13, 12, 40, 0)); // Ajustar Fecha
  DateTime now = rtc.now();
@@ -106,151 +134,188 @@ void Reloj(){
 }
 
 void Si1145(){
-  SIV = SI1145.ReadVisible();       Serial.print(SIV);Serial.print(";");
-  SII = SI1145.ReadIR();            Serial.print(SII);Serial.print(";");
-  SIU = (float)SI1145.ReadUV()/100; Serial.print(SIU);Serial.print(";"); 
+  SIV = SI1145.ReadVisible();       
+  Serial.print("SIV:");
+  Serial.print(SIV);Serial.print(";");
+  delay(1);
+  SII = SI1145.ReadIR();            
+  Serial.print("SII:");
+  Serial.print(SII);Serial.print(";");
+  delay(1);
+  SIU = (float)SI1145.ReadUV()/100; 
+  Serial.print("SIU:");
+  Serial.print(SIU);Serial.print(";"); 
+  delay(1);
   Xbee.print("si1145-visible=");   Xbee.print(SIV);Xbee.print(";");
   Xbee.print("si1145-infrared=");  Xbee.print(SII);Xbee.print(";");
   Xbee.print("si1145-uv=");        Xbee.print(SIU);Xbee.print(";"); 
-
-  
-  delay(500);   
 }
 
 void Flora(){
   uint16_t x = tsl.getLuminosity(TSL2561_VISIBLE);//Serial.println(x, DEC);
   uint32_t lum = tsl.getFullLuminosity();
   uint16_t ir, full;ir = lum >> 16;full = lum & 0xFFFF;
-  FV =(full - ir);                  Serial.print(FV);Serial.print(";"); 
-  FI =(ir);                         Serial.print(FI);Serial.print(";");        
-  FL =(tsl.calculateLux(full, ir)); Serial.print(FL);Serial.print(";");
+  FV =(full - ir);                  
+  Serial.print("FV:");
+  Serial.print(FV);Serial.print(";"); 
+  FI =(ir);                         
+  Serial.print("FI:");
+  Serial.print(FI);Serial.print(";");        
+  FL =(tsl.calculateLux(full, ir)); 
+  Serial.print("FV:");
+  Serial.print(FL);Serial.print(";");
   Xbee.print("flora-visible=");  Xbee.print(FV);Xbee.print(";"); 
   Xbee.print("flora-infrared=");  Xbee.print(FI);Xbee.print(";");        
   Xbee.print("flora-lux=");  Xbee.print(FL);Xbee.print(";");
-  delay(500);
 }
 
 void Sht10(){
-  SHT = sht1x.readTemperatureC(); Serial.print(SHT);Serial.print(" ");
-  SHH = sht1x.readHumidity();     Serial.print(SHH);Serial.print(" ");
+  SHT = sht1x.readTemperatureC(); 
+  Serial.print("SHT:");
+  Serial.print(SHT);Serial.print(" ");
+  delay(1);
+  SHH = sht1x.readHumidity();     
+  Serial.print("SHH:");
+  Serial.print(SHH);Serial.print(" ");
+  delay(1);
 //SHF =  sht1x.readTemperatureF(); 
   Xbee.print("sht10-temp=");Xbee.print(SHT);Xbee.print(";");
   Xbee.print("sht10-humidity="); Xbee.print(SHH);Xbee.print(";");  
-  delay(500);
 }
 
 void Pt100(){
-  PT1 = analogRead (A1); TP1 = ((PT1*4.6)/1024)*100;
-      Serial.print(TP1);Serial.print(" ");   
-      Xbee.print("pt100-temp="); Xbee.print(TP1);Xbee.print(";"); 
+  int k=10;
+  PT1=AverageMeasurement(1,k) ;
+  TP1 = ((PT1*4.6)/1024)*100;
+  Serial.print("PT1:"); 
+  Serial.print(TP1); Serial.print(" ");   
+  Xbee.print("pt100-temp="); Xbee.print(TP1);Xbee.print(";"); 
 //P2 = analogRead (A2); TP2 = ((P2*4.6)/1024)*124.136 -15;
 //     Serial.print(TP2);Serial.print(" "); 
-  delay(500);
 }
 
 void SondaDS18B20(){
     DS18B20.requestTemperatures();
+    delay(1);
     DS18=(DS18B20.getTempCByIndex(0));
+    delay(1);
+    Serial.print("T-DS18:");
     Serial.print(DS18);Serial.print(" ");
     Xbee.print("ds18b20-temp=");Xbee.print(DS18);Xbee.print(";");
-    delay(500);
 }
 
-void granada(){
-  float Vin,Vo;
+void SoilWater(float T){
+  float Vin,Vo,SMP; int k=10;
+  
   digitalWrite(52,HIGH);
   digitalWrite(53, LOW);  
   delay(1); 
-  Vin = analogRead(10);
-  Vo = analogRead(11);
-  res=4700*(Vin/Vo-1);
+
+  Vin=AverageMeasurement(10,k) ;
+  Vo=AverageMeasurement(11,k) ;
+  res=1500*(Vin/Vo-1);
 
   digitalWrite(52,LOW);
   digitalWrite(53, HIGH); 
   delay(1);
-  Vin = analogRead(11);
-  Vo = analogRead(10);
-  res=(res+4700*(Vin/Vo-1))/2.0;  
+  Vin=AverageMeasurement(11,k) ;
+  Vo=AverageMeasurement(10,k) ;
+  res=(res+1500*(Vin/Vo-1))/2.0;  
+  SMP=(-0.0032*res-4.093)/(1-9.7330e-06*res-0.01205*T);
 
   digitalWrite(52,LOW);
   digitalWrite(53, LOW); 
-  
-  Serial.print(res);Serial.print(" ");
+  Serial.print("200ss:");
+  Serial.print(SMP);Serial.print(" ");
   Xbee.print("200ss-humidity="); Xbee.print(res);Xbee.print(";");    
 }
 
 void Bateria(){
-  Bat = analogRead(A9);
+  float B_val=0; int k=10;
+  Bat=AverageMeasurement(9,k) ;
+  Bat = Bat/237.0*100;
+  Serial.print("Bat:");
   Serial.print(Bat);Serial.print(" ");
   Xbee.print("battery");Xbee.print(Bat);Xbee.print(";");
-  delay(500);
 }
 
 void Hoja(){
-  Hj = analogRead(A15);
+  float H_val=0; int k=10;
+  H_val=AverageMeasurement(15,k) ;
+  Hj = H_val;
+  delay(1); 
+  Serial.print("LH:");
   Serial.print(Hj);Serial.print(" ");
   Xbee.print("leaf-humidity=");Xbee.print(Hj);Xbee.print(";");
-  delay(500);
 }
 
-void lm35(){
-  digitalWrite(29, HIGH);
-  delay(1000);  
-  value = analogRead(A4);
-  Serial.print(value);Serial.print(" ");  
-  millivolts = (value / 1023.0) * 5000.0;
+void lm35(){ 
+  int k=10; float T_val=0;
+  T_val=AverageMeasurement(4,k) ;
+  millivolts = (T_val / 1023.0) * 5000.0;
   celsius = millivolts / 10.0;
-  Serial.print(celsius);Serial.println(" ");
-  Xbee.print("lm35-temp=");Xbee.print(celsius);Xbee.println(";");   
-  delay(500);
-  digitalWrite(29, LOW);
+  Serial.print("LM35:");
+  Serial.print(celsius);Serial.print(" ");
+  Xbee.print("lm35-temp=");Xbee.print(celsius);Xbee.print(";");   
 }
 
-void ledsON(){
-digitalWrite(2, HIGH);
-digitalWrite(3, HIGH);
-digitalWrite(4, HIGH);
-digitalWrite(5, HIGH);
-digitalWrite(6, HIGH);
-digitalWrite(7, HIGH);
-digitalWrite(8, HIGH);
-digitalWrite(9, HIGH);
-digitalWrite(10, HIGH);
-digitalWrite(23, HIGH);
-digitalWrite(24, HIGH);//LED
-digitalWrite(25, HIGH);
-digitalWrite(26, HIGH);//LED
-digitalWrite(27, HIGH);
-digitalWrite(29, HIGH);
-digitalWrite(30, HIGH);   
-digitalWrite(31, HIGH);
-digitalWrite(33, HIGH);
-digitalWrite(35, HIGH);
-digitalWrite(37, HIGH);
-digitalWrite(46, HIGH);
-digitalWrite(50, HIGH);
+float AverageMeasurement(int Port,int K){
+  // This function read a analog port "K" times and then return de average value.
+  float Result=0,Val=0;
+  for(int i=1; i <= K; i++){
+    Val = Val+analogRead(Port);
+    delay(1);   
+  }
+  Result=Val/K;  
+  return Result;
 }
-void ledsOFF(){
-//digitalWrite(2, LOW);
-digitalWrite(3, LOW);
-digitalWrite(4, LOW);
-digitalWrite(5, LOW);
-digitalWrite(6, LOW);
-digitalWrite(7, LOW);
-digitalWrite(8, LOW);
-digitalWrite(9, LOW);
-digitalWrite(10, LOW);
-digitalWrite(23, LOW);
-digitalWrite(24, LOW);//LED
-digitalWrite(25, LOW);
-digitalWrite(26, LOW);//LED
-digitalWrite(27, LOW);
-digitalWrite(29, LOW);
-digitalWrite(30, LOW);   
-digitalWrite(31, LOW);
-digitalWrite(33, LOW);
-digitalWrite(35, LOW);
-digitalWrite(37, LOW);
-//digitalWrite(46, LOW);
-digitalWrite(50, LOW);
+
+void SwON(){
+  digitalWrite(2, HIGH);
+  digitalWrite(3, HIGH);
+  digitalWrite(4, HIGH);
+  digitalWrite(5, HIGH);
+  digitalWrite(6, HIGH);
+  digitalWrite(7, HIGH);
+  digitalWrite(8, HIGH);
+  digitalWrite(9, HIGH);
+  digitalWrite(10, HIGH);
+  digitalWrite(23, HIGH);
+  digitalWrite(24, HIGH);//LED 1
+  digitalWrite(25, HIGH);
+  digitalWrite(26, HIGH);//LED 2
+  digitalWrite(27, HIGH);
+  digitalWrite(29, HIGH); // LM35
+  digitalWrite(30, HIGH);   
+  digitalWrite(31, HIGH);
+  digitalWrite(33, HIGH);
+  digitalWrite(35, HIGH);
+  digitalWrite(37, HIGH);
+  digitalWrite(46, HIGH);
+  digitalWrite(50, HIGH);
+}
+
+void SwOFF(){
+  //digitalWrite(2, LOW);
+  digitalWrite(3, LOW);
+  digitalWrite(4, LOW);
+  digitalWrite(5, LOW);
+  digitalWrite(6, LOW);
+  digitalWrite(7, LOW);
+  digitalWrite(8, LOW);
+  digitalWrite(9, LOW);
+  digitalWrite(10, LOW);
+  digitalWrite(23, LOW);
+  digitalWrite(24, LOW);//LED
+  digitalWrite(25, LOW);
+  digitalWrite(26, LOW);//LED
+  digitalWrite(27, LOW);
+  digitalWrite(29, LOW);// LM35
+  digitalWrite(30, LOW);   
+  digitalWrite(31, LOW);
+  digitalWrite(33, LOW);
+  digitalWrite(35, LOW);
+  digitalWrite(37, LOW);
+  //digitalWrite(46, LOW);
+  digitalWrite(50, LOW);
 }
