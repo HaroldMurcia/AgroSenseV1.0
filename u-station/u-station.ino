@@ -27,7 +27,7 @@ TSL2561 tsl(TSL2561_ADDR_FLOAT);
 
 
 int Anio,Mes,Dia,Hora,Min,FV,FI,FL,SIV,SII,V1,V2,PT1,Hj,Bat;
-float DS18,SHT,SHH,SIU,res,P1,P2,TP1,TP2,PT,millivolts,celsius;
+float DS18,SHT,SHH,SIU,res,P1,P2,TP1,TP2,PT,millivolts,celsius,SMP;
 char  daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 const int chipSelect = 10;
 float ElapsedTime,tic,toc;
@@ -82,24 +82,32 @@ void setup(){
   delay(500);
 }
 
-//////////////////////// Main Loop
+struct Data{
+  float Val[3]={0,0,0};
+};
+
+///////////////////////////////////////////////////////////////////////////////////////// Main Loop
 void loop(){
   tic=millis();
+
   
+    
   SwON();
   delay(500);
-  Reloj();          //--->Reloj
+  Clock();          //--->Reloj
   Si1145();         //--->Sensor IF,UV,VIS  
   Flora();          //--->Sensor Flora  
   Sht10();          //--->Sensor Tem,Hum
   Pt100();          //--->Sonda Pt100
   SondaDS18B20();   //--->Sonda Ds18B20  
-  Bateria();
-  Hoja(); 
+  Battery();
+  Leaf(); 
   lm35(); 
   SoilWater(celsius);
   SwOFF();
-  
+
+  Filtro(0,celsius);
+  PrintData(0);
 
   // SampleTime measurement
   toc=millis();
@@ -110,45 +118,26 @@ void loop(){
   }
   Serial.print("dTime:");
   Serial.println(ElapsedTime/1000.0);
+  Xbee.print("dTime:");
+  Xbee.println(ElapsedTime/1000.0);
 }
-
+/////////////////////////////////////////////////////////////////////////////////////////
 
 /// Functions
 
-void Reloj(){
- rtc.adjust(DateTime(2017, 1, 13, 12, 40, 0)); // Ajustar Fecha
- DateTime now = rtc.now();
-   Anio=now.year();  Mes=now.month();  Dia=now.day();  Hora=now.hour();  Min=now.minute();
-    Serial.print(Anio); Serial.print(";");
-    Serial.print(Mes);  Serial.print(";");
-    Serial.print(Dia);  Serial.print(";");
-    Serial.print(Hora); Serial.print(";");
-    Serial.print(Min);  Serial.print(";");
-
-    Xbee.print("year="); Xbee.print(Anio); Xbee.print(";");
-    Xbee.print("month=");Xbee.print(Mes);  Xbee.print(";");
-    Xbee.print("day=");Xbee.print(Dia);  Xbee.print(";");
-    Xbee.print("hour=");Xbee.print(Hora); Xbee.print(";");
-    Xbee.print("minute=");Xbee.print(Min);  Xbee.print(";");
-    delay(500);
+void Clock(){
+  rtc.adjust(DateTime(2017, 1, 13, 12, 40, 0)); // Ajustar Fecha
+  DateTime now = rtc.now();
+  Anio=now.year();  Mes=now.month();  Dia=now.day();  Hora=now.hour();  Min=now.minute();
 }
 
 void Si1145(){
   SIV = SI1145.ReadVisible();       
-  Serial.print("SIV:");
-  Serial.print(SIV);Serial.print(";");
   delay(1);
   SII = SI1145.ReadIR();            
-  Serial.print("SII:");
-  Serial.print(SII);Serial.print(";");
   delay(1);
   SIU = (float)SI1145.ReadUV()/100; 
-  Serial.print("SIU:");
-  Serial.print(SIU);Serial.print(";"); 
   delay(1);
-  Xbee.print("si1145-visible=");   Xbee.print(SIV);Xbee.print(";");
-  Xbee.print("si1145-infrared=");  Xbee.print(SII);Xbee.print(";");
-  Xbee.print("si1145-uv=");        Xbee.print(SIU);Xbee.print(";"); 
 }
 
 void Flora(){
@@ -156,40 +145,22 @@ void Flora(){
   uint32_t lum = tsl.getFullLuminosity();
   uint16_t ir, full;ir = lum >> 16;full = lum & 0xFFFF;
   FV =(full - ir);                  
-  Serial.print("FV:");
-  Serial.print(FV);Serial.print(";"); 
-  FI =(ir);                         
-  Serial.print("FI:");
-  Serial.print(FI);Serial.print(";");        
+  FI =(ir);                                
   FL =(tsl.calculateLux(full, ir)); 
-  Serial.print("FV:");
-  Serial.print(FL);Serial.print(";");
-  Xbee.print("flora-visible=");  Xbee.print(FV);Xbee.print(";"); 
-  Xbee.print("flora-infrared=");  Xbee.print(FI);Xbee.print(";");        
-  Xbee.print("flora-lux=");  Xbee.print(FL);Xbee.print(";");
 }
 
 void Sht10(){
   SHT = sht1x.readTemperatureC(); 
-  Serial.print("SHT:");
-  Serial.print(SHT);Serial.print(" ");
   delay(1);
   SHH = sht1x.readHumidity();     
-  Serial.print("SHH:");
-  Serial.print(SHH);Serial.print(" ");
   delay(1);
-//SHF =  sht1x.readTemperatureF(); 
-  Xbee.print("sht10-temp=");Xbee.print(SHT);Xbee.print(";");
-  Xbee.print("sht10-humidity="); Xbee.print(SHH);Xbee.print(";");  
+//SHF =  sht1x.readTemperatureF();  
 }
 
 void Pt100(){
   int k=10;
   PT1=AverageMeasurement(1,k) ;
-  TP1 = ((PT1*4.6)/1024)*100;
-  Serial.print("PT1:"); 
-  Serial.print(TP1); Serial.print(" ");   
-  Xbee.print("pt100-temp="); Xbee.print(TP1);Xbee.print(";"); 
+  TP1 = ((PT1*4.6)/1024)*100; 
 //P2 = analogRead (A2); TP2 = ((P2*4.6)/1024)*124.136 -15;
 //     Serial.print(TP2);Serial.print(" "); 
 }
@@ -199,18 +170,14 @@ void SondaDS18B20(){
     delay(1);
     DS18=(DS18B20.getTempCByIndex(0));
     delay(1);
-    Serial.print("T-DS18:");
-    Serial.print(DS18);Serial.print(" ");
-    Xbee.print("ds18b20-temp=");Xbee.print(DS18);Xbee.print(";");
 }
 
 void SoilWater(float T){
-  float Vin,Vo,SMP; int k=10;
+  float Vin,Vo; int k=10;
   
   digitalWrite(52,HIGH);
   digitalWrite(53, LOW);  
   delay(1); 
-
   Vin=AverageMeasurement(10,k) ;
   Vo=AverageMeasurement(11,k) ;
   res=1500*(Vin/Vo-1);
@@ -224,39 +191,107 @@ void SoilWater(float T){
   SMP=(-0.0032*res-4.093)/(1-9.7330e-06*res-0.01205*T);
 
   digitalWrite(52,LOW);
-  digitalWrite(53, LOW); 
-  Serial.print("200ss:");
-  Serial.print(SMP);Serial.print(" ");
-  Xbee.print("200ss-humidity="); Xbee.print(res);Xbee.print(";");    
+  digitalWrite(53, LOW);    
 }
 
-void Bateria(){
+void Battery(){
   float B_val=0; int k=10;
   Bat=AverageMeasurement(9,k) ;
   Bat = Bat/237.0*100;
-  Serial.print("Bat:");
-  Serial.print(Bat);Serial.print(" ");
-  Xbee.print("battery");Xbee.print(Bat);Xbee.print(";");
 }
 
-void Hoja(){
+void Leaf(){
   float H_val=0; int k=10;
   H_val=AverageMeasurement(15,k) ;
   Hj = H_val;
-  delay(1); 
-  Serial.print("LH:");
-  Serial.print(Hj);Serial.print(" ");
-  Xbee.print("leaf-humidity=");Xbee.print(Hj);Xbee.print(";");
 }
 
 void lm35(){ 
   int k=10; float T_val=0;
   T_val=AverageMeasurement(4,k) ;
   millivolts = (T_val / 1023.0) * 5000.0;
-  celsius = millivolts / 10.0;
-  Serial.print("LM35:");
-  Serial.print(celsius);Serial.print(" ");
-  Xbee.print("lm35-temp=");Xbee.print(celsius);Xbee.print(";");   
+  celsius = millivolts / 10.0 -3.5; 
+  
+  Data T_LM35; 
+  T_LM35.Val[2]=T_LM35.Val[1];
+  T_LM35.Val[1]=T_LM35.Val[0];
+  T_LM35.Val[0]=celsius;
+  
+}
+
+void PrintData(int mode){
+  // mode=1 to print labels via USB
+  // Clock
+//    Serial.print(Anio); Serial.print('\t');
+//    Serial.print(Mes);  Serial.print('\t');
+//    Serial.print(Dia);  Serial.print('\t');
+//    Serial.print(Hora); Serial.print('\t');
+//    Serial.print(Min);  Serial.print('\t');
+    Xbee.print("year="); Xbee.print(Anio); Xbee.print('\t');
+    Xbee.print("month=");Xbee.print(Mes);  Xbee.print('\t');
+    Xbee.print("day=");Xbee.print(Dia);  Xbee.print('\t');
+    Xbee.print("hour=");Xbee.print(Hora); Xbee.print('\t');
+    Xbee.print("minute=");Xbee.print(Min);  Xbee.print('\t');
+
+  // Light Si1145
+    if(mode==1){Serial.print("SIV:");}
+    Serial.print(SIV);Serial.print('\t');
+    if(mode==1){Serial.print("SII:");}
+    Serial.print(SII);Serial.print('\t');
+    if(mode==1){Serial.print("SIU:");}
+    Serial.print(SIU);Serial.print('\t');
+    Xbee.print("si1145-visible=");   Xbee.print(SIV);Xbee.print('\t');
+    Xbee.print("si1145-infrared=");  Xbee.print(SII);Xbee.print('\t');
+    Xbee.print("si1145-uv=");        Xbee.print(SIU);Xbee.print('\t'); 
+
+  // Light Flora
+    if(mode==1){Serial.print("FV:");}
+    Serial.print(FV);Serial.print('\t'); 
+    if(mode==1){Serial.print("FI:");}
+    Serial.print(FI);Serial.print('\t');
+    if(mode==1){Serial.print("FL:");}
+    Serial.print(FL);Serial.print('\t');
+    Xbee.print("flora-visible=");  Xbee.print(FV);Xbee.print('\t'); 
+    Xbee.print("flora-infrared=");  Xbee.print(FI);Xbee.print('\t');        
+    Xbee.print("flora-lux=");  Xbee.print(FL);Xbee.print('\t');
+
+  // SHT10
+    if(mode==1){Serial.print("SHT:");}
+    Serial.print(SHT);Serial.print('\t');
+    if(mode==1){Serial.print("SHH:");}
+    Serial.print(SHH);Serial.print('\t');
+    Xbee.print("sht10-temp=");Xbee.print(SHT);Xbee.print(";");
+    Xbee.print("sht10-humidity="); Xbee.print(SHH);Xbee.print(";"); 
+
+  // PT100 1
+    if(mode==1){Serial.print("PT1:"); }
+    Serial.print(TP1); Serial.print('\t');  
+    Xbee.print("pt100-temp="); Xbee.print(TP1);Xbee.print('\t'); 
+
+  // SondaDS18B20
+    if(mode==1){Serial.print("T-DS18:");}
+    Serial.print(DS18);Serial.print('\t');
+    Xbee.print("ds18b20-temp=");Xbee.print(DS18);Xbee.print('\t');
+
+  // SoilWater
+    if(mode==1){Serial.print("200ss:");}
+    Serial.print(SMP);Serial.print('\t');
+    Xbee.print("200ss-humidity="); Xbee.print(SMP);Xbee.print('\t'); 
+
+  // Battery
+    if(mode==1){Serial.print("Batt:");}
+    Serial.print(Bat);Serial.print('\t');
+    Xbee.print("battery");Xbee.print(Bat);Xbee.print('\t');
+
+ // Leaf
+    if(mode==1){Serial.print("LH:");}
+    Serial.print(Hj);Serial.print('\t');
+    Xbee.print("leaf-humidity=");Xbee.print(Hj);Xbee.print('\t');
+
+ // LM35 - Internal Temperature
+    if(mode==1){Serial.print("LM35:");}
+    Serial.print(celsius);Serial.print('\t');
+    Xbee.print("lm35-temp=");Xbee.print(celsius);Xbee.print('\t'); 
 }
 
 float AverageMeasurement(int Port,int K){
@@ -264,11 +299,23 @@ float AverageMeasurement(int Port,int K){
   float Result=0,Val=0;
   for(int i=1; i <= K; i++){
     Val = Val+analogRead(Port);
-    delay(1);   
+    delay(10);   
   }
   Result=Val/K;  
   return Result;
 }
+
+void Filtro(float u, float meassurement){
+  float X,X_1,B,F,Q,P,K,H,R;
+  u=0; B=0;F=1;Q=1e-9;H=1;R=0.2090;
+  X=X*F+B*u;
+  P=F*P*F+Q;
+  K=P*H/(H*P*H+R);
+  X=X+K*(meassurement-H*X);
+  P=(1-K*H)*P;
+  Serial.print(X), Serial.print('\t');
+}
+
 
 void SwON(){
   digitalWrite(2, HIGH);
