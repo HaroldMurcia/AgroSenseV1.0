@@ -8,6 +8,7 @@ clear,clc,close all
 
 Data=load('test.txt');
 
+
 % Light 
     lightVis1=Data(:,6);
     lightVis2=Data(:,9);
@@ -17,9 +18,9 @@ Data=load('test.txt');
     Lux=Data(:,11);
 % Temperature
     Tair=Data(:,12);
-    PT100_1=Data(:,14);
+    PT100_1=Data(:,14)+5.0923;
     Ds18=Data(:,16);
-    Lm35=Data(:,20);
+    Lm35=Data(:,20)-1.2750;
     
 % Humidity
     Hair=Data(:,13);
@@ -59,7 +60,9 @@ figure(2)
     plot(Ds18)
     plot(Lm35)
     ylabel('Temperature [?C]')
-    legend('Air','PT100_{1}','Ds18','Lm35')
+    plot(Data(:,1)-1.2750)
+    legend('Air','PT100_{1}','Ds18','Lm35','filter')
+    
     
 figure(3)
     subplot(211)

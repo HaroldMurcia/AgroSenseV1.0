@@ -25,11 +25,34 @@ OneWire oneWire_in(A5);DallasTemperature DS18B20(&oneWire_in);
 
 int Anio,Mes,Dia,Hora,Min,FV,FI,FL,SIV,SII,V1,V2,PT1,PT2,Hj,Bat,pin,md;
 int Clk,Si,Fl,Sh,Pt,Ds,Bt,Lf,Lm,Sw;
-float DS18,SHT,SHH,SIU,res,P,P2,TP1,TP2,PT,millivolts,celsius,SMP;
+float DS18,SHT,SHH,SIU,res,P2,TP1,TP2,PT,millivolts,celsius,SMP;
 char  daysOfTheWeek[7][12]={"S","M","T","W","T","F","S"};
 float ElapsedTime,tic,toc;
-float const Ts=5000;
+float const Ts=60000;
 int Pines[]={2,3,4,5,6,7,8,9,10,23,24,25,26,27,29,30,31,32,33,34,35,37,46,50,52,53};
+float X,P; // Filtro
+
+
+  struct DATA {
+    float meassurement;
+    float P;
+    float Q;
+    float R;
+    float X;
+  };
+  DATA LM35={0,1e3,0.5e-3,2.5,0};
+  DATA PT100_1={0,1e3,0.5e-3,0.7,0};
+  DATA TAIR={0,1e3,0.5e-3,0.06,0};
+  DATA HAIR={0,1e3,0.5e-3,0.3648,0};
+  DATA SOILM={0,1e3,0.5e-3,0.01,0};
+  DATA VIS1={0,1e3,0.5e-3,0.9818,0};
+  DATA IR1={0,1e3,0.5e-3,0.9818,0};
+  DATA UV1={0,1e3,0.5e-3,0.9818,0};
+  DATA VIS2={0,1e3,0.5e-3,0.9818,0};
+  DATA IR2={0,1e3,0.5e-3,0.9818,0};
+  DATA LUX={0,1e3,0.5e-3,0.9818,0};
+
+
 // Boton 32,34 - Leds 24,26
 //------------Main-----------------//
 void setup(){
@@ -42,30 +65,67 @@ void setup(){
   md=0;
 }
 
+
+
+  
+
 void loop(){
   tic=millis();
  // Boton();
   SwON();
   delay(1000);
-  Clock();        //--->Reloj
+//  Clock();        //--->Reloj
   Si1145();       //--->Sensor IF,UV,VIS  
   Flora();          //--->Sensor Flora  
   Sht10();          //--->Sensor Tem,Hum
   Pt100();          //--->Sonda Pt100
-  SondaDS18B20();   //--->Sonda Ds18B20  
-  Battery();
-  Leaf(); 
+//  SondaDS18B20();   //--->Sonda Ds18B20  
+//  Battery();
+//  Leaf(); 
   lm35(); 
   SoilWater(celsius);
   SwOFF();
+  
+  // Filtrado
+  Filtro(celsius,LM35.P,LM35.Q,LM35.R,LM35.X);
+  LM35.P=P;LM35.X=X;
+  
+  Filtro(TP1,PT100_1.P,PT100_1.Q,PT100_1.R,PT100_1.X);
+  PT100_1.P=P;PT100_1.X=X;
 
-  pinMode(11,OUTPUT);
-  digitalWrite(11,LOW);
-  delay(60000);
-  //Filtro(0,celsius);
+  Filtro(SHT,TAIR.P,TAIR.Q,TAIR.R,TAIR.X);
+  TAIR.P=P;TAIR.X=X;
+
+  Filtro(SHH,HAIR.P,HAIR.Q,HAIR.R,HAIR.X);
+  HAIR.P=P;HAIR.X=X;
+
+  Filtro(SMP,SOILM.P,SOILM.Q,SOILM.R,SOILM.X);
+  SOILM.P=P;SOILM.X=X;
+
+  Filtro(SIV,VIS1.P,VIS1.Q,VIS1.R,VIS1.X);
+  VIS1.P=P;VIS1.X=X;
+
+  Filtro(SII,IR1.P,IR1.Q,IR1.R,IR1.X);
+  IR1.P=P;IR1.X=X;
+
+  Filtro(SIU,UV1.P,UV1.Q,UV1.R,UV1.X);
+  UV1.P=P;UV1.X=X;
+
+  Filtro(FV,VIS2.P,VIS2.Q,VIS2.R,VIS2.X);
+  VIS2.P=P;VIS2.X=X;
+
+  Filtro(FI,IR2.P,IR2.Q,IR2.R,IR2.X);
+  IR2.P=P;IR2.X=X;
+
+  Filtro(FL,LUX.P,LUX.Q,LUX.R,LUX.X);
+  LUX.P=P;LUX.X=X;
+
+  //pinMode(11,OUTPUT);
+  //digitalWrite(11,LOW);
+  //delay(60000);
   PrintData(1);
-  pinMode(11,INPUT);
-  digitalWrite(11,HIGH);
+  //pinMode(11,INPUT);
+  //digitalWrite(11,HIGH);
 
 //SampleTime measurement
   toc=millis();
@@ -75,9 +135,10 @@ void loop(){
     ElapsedTime=(toc-tic);
   }
   //Serial.print("dTime:");
-  //Serial.println(ElapsedTime/1000.0);
+ // Serial.println('\t');
+ // Serial.println(ElapsedTime/1000.0);
  // Serial3.print('dTime:');
-  //Serial3.println(ElapsedTime/1000.0);
+ // Serial3.println(ElapsedTime/1000.0);
 }
 
 
@@ -90,19 +151,24 @@ void loop(){
 //  if(B1==1 && md==1){
 //    md=0;SwON();delay(2000);SwOFF();}
 //}
-void Clock(){Clk=1;
+
+
+void Clock(){
+  Clk=1;
   rtc.begin();delay(100);
   //rtc.adjust(DateTime(2017, 1, 13, 12, 40, 0));
   DateTime now = rtc.now();delay(1);
   Anio=now.year(); Mes=now.month(); Dia=now.day(); Hora=now.hour(); Min=now.minute();
 }
-void Si1145(){Si=1;
+void Si1145(){
+  Si=1;
   SI1145.Begin();
   SIV = SI1145.ReadVisible();       delay(1);
   SII = SI1145.ReadIR();            delay(1);
   SIU = (float)SI1145.ReadUV()/100; delay(1);
 }
-void Flora(){Fl=1;
+void Flora(){
+  Fl=1;
   tsl.begin();                                    //--->Inicia Flora light
   tsl.setGain(TSL2561_GAIN_16X);                  //--->Conf Flora light
   tsl.setTiming(TSL2561_INTEGRATIONTIME_101MS);   //--->Conf Flora light
@@ -115,21 +181,24 @@ void Flora(){Fl=1;
   FI =(ir);                                
   FL =(tsl.calculateLux(full, ir)); 
 }
-void Sht10(){Sh=1;
+void Sht10(){
+  Sh=1;
   SHT = sht1x.readTemperatureC(); delay(1);
   SHH = sht1x.readHumidity();     delay(1);
 //SHF = sht1x.readTemperatureF();  
 }
-void Pt100(){Pt=1;
+void Pt100(){
+  Pt=1;
   int k = 10;
   //TP1 = analogRead(A1);
   //TP2 = analogRead(A2);
   PT1 = AverageMeasurement(1,k) ;
-  TP1 = PT1*0.4473-7.2517; 
+  TP1 = PT1*0.4473-3.1594; 
   PT2 = AverageMeasurement(2,k) ;
-  TP2 = PT2*0.4374   -4.8990; 
+  TP2 = PT2*0.4374   -3.1594; 
 }
-void SondaDS18B20(){Ds=1;
+void SondaDS18B20(){
+  Ds=1;
     DS18B20.begin();                    delay(10);
     DS18B20.requestTemperatures();      delay(1);
     DS18=(DS18B20.getTempCByIndex(0));  delay(1);
@@ -150,34 +219,54 @@ void SoilWater(float T){
   Vin=AverageMeasurement(11,k) ;
   Vo=AverageMeasurement(10,k) ;
   res=(res+1500*(Vin/Vo-1))/2.0;  
-  SMP=(-0.0032*res-4.093)/(1-9.7330e-06*res-0.01205*T);
+  //SMP=(-0.0032*res-4.093)/(1-9.7330e-06*res-0.01205*T);
+  SMP=res;
   digitalWrite(52,LOW);
   digitalWrite(53, LOW);    
 }
-void Battery(){Bt=1;
+
+void Battery(){
+  Bt=1;
   float B_val=0; int k=10;
   Bat=AverageMeasurement(9,k) ;
   Bat = Bat/237.0*100;
 }
-void Leaf(){Lf=1;
+void Leaf(){
+  Lf=1;
   float H_val=0; int k=10;
   H_val=AverageMeasurement(15,k) ;
   Hj = H_val;
 }
-void lm35(){Lm=1;
+
+void lm35(){
+  Lm=1;
+  float X,P,P_1,Q,K,R; //FILTRO
   int k=10; float T_val=0;
+  
   T_val=AverageMeasurement(4,k) ;
   millivolts = (T_val / 1023.0) * 5000.0;
-  celsius = millivolts / 10.0 -3.5; 
+  celsius = millivolts / 10.0 -3.575;
 }
+
+
+void Filtro(float meassurement, float p, float Q, float R, float x){
+  p=p+Q;
+  float K=p/(p+R);
+  x=x+K*(meassurement-x);
+  p=(1-K)*p;
+  //P_1=P;
+  X=x; P=p; 
+}
+
+
 void PrintData(int mode){
 //CLK
   if(Clk==0){Anio=0000;Mes=00;Dia=00;Hora=00;Min=00;}
   switch(mode){
     case 0:
-    Serial.print(Anio); Serial.print(" "); Serial.print(Mes);  Serial.print(" ");
-    Serial.print(Dia);  Serial.print(" "); Serial.print(Hora); Serial.print(" ");
-    Serial.print(Min);  Serial.print(" "); 
+    Serial.print(Anio); Serial.print('\t'); Serial.print(Mes);  Serial.print('\t');
+    Serial.print(Dia);  Serial.print('\t'); Serial.print(Hora); Serial.print('\t');
+    Serial.print(Min);  Serial.print('\t'); 
     Serial3.print("year=");  Serial3.print(Anio); Serial3.print('\t');
     Serial3.print("month="); Serial3.print(Mes);  Serial3.print('\t');
     Serial3.print("day=");   Serial3.print(Dia);  Serial3.print('\t');
@@ -185,9 +274,9 @@ void PrintData(int mode){
     Serial3.print("minute=");Serial3.print(Min);  Serial3.print('\t');
     break;
     case 1:
-    Serial.print(Anio); Serial.print(" "); Serial.print(Mes);  Serial.print(" ");
-    Serial.print(Dia);  Serial.print(" "); Serial.print(Hora); Serial.print(" ");
-    Serial.print(Min);  Serial.print(" "); 
+    Serial.print(Anio); Serial.print('\t'); Serial.print(Mes);  Serial.print('\t');
+    Serial.print(Dia);  Serial.print('\t'); Serial.print(Hora); Serial.print('\t');
+    Serial.print(Min);  Serial.print('\t'); 
     Serial3.print(Anio); Serial3.print('\t'); Serial3.print(Mes);  Serial3.print('\t');
     Serial3.print(Dia);  Serial3.print('\t'); Serial3.print(Hora); Serial3.print('\t');
     Serial3.print(Min);  Serial3.print('\t');
@@ -196,71 +285,71 @@ void PrintData(int mode){
   if(Si==0){SIV=000;SII=000;SIU=0.00;}
   switch(mode){
     case 0:
-    Serial.print("SIV:");Serial.print(SIV);Serial.print(" ");
-    Serial.print("SII:");Serial.print(SII);Serial.print(" ");
-    Serial.print("SIU:");Serial.print(SIU);Serial.print(" ");
-    Serial3.print("si1145-visible=");   Serial3.print(SIV);Serial3.print('\t');
-    Serial3.print("si1145-infrared=");  Serial3.print(SII);Serial3.print('\t');
-    Serial3.print("si1145-uv=");        Serial3.print(SIU);Serial3.print('\t'); 
+    Serial.print("SIV:");Serial.print(VIS1.X);Serial.print('\t');
+    Serial.print("SII:");Serial.print(IR1.X);Serial.print('\t');
+    Serial.print("SIU:");Serial.print(UV1.X);Serial.print('\t');
+    Serial3.print("si1145-visible=");   Serial3.print(VIS1.X);Serial3.print('\t');
+    Serial3.print("si1145-infrared=");  Serial3.print(IR1.X);Serial3.print('\t');
+    Serial3.print("si1145-uv=");        Serial3.print(UV1.X);Serial3.print('\t'); 
     break;
     case 1:
-    Serial.print(SIV);Serial.print(" ");
-    Serial.print(SII);Serial.print(" ");
-    Serial.print(SIU);Serial.print(" ");
-    Serial3.print(SIV);Serial3.print('\t');
-    Serial3.print(SII);Serial3.print('\t');
-    Serial3.print(SIU);Serial3.print('\t');
+    Serial.print(VIS1.X);Serial.print('\t');
+    Serial.print(IR1.X);Serial.print('\t');
+    Serial.print(SIU);Serial.print('\t');
+    Serial3.print(VIS1.X);Serial3.print('\t');
+    Serial3.print(IR1.X);Serial3.print('\t');
+    Serial3.print(UV1.X);Serial3.print('\t');
     break;
     }
 // Light Flora
   if(Fl==0){FV=000;FI=000;FL=0.00;}
   switch(mode){
     case 0:
-    Serial.print("FV:");Serial.print(FV);Serial.print(" "); 
-    Serial.print("FI:");Serial.print(FI);Serial.print(" ");
-    Serial.print("FL:");Serial.print(FL);Serial.print(" ");
-    Serial3.print("flora-visible=");   Serial3.print(FV);Serial3.print('\t'); 
-    Serial3.print("flora-infrared=");  Serial3.print(FI);Serial3.print('\t');        
-    Serial3.print("flora-lux=");       Serial3.print(FL);Serial3.print('\t');
+    Serial.print("FV:");Serial.print(VIS2.X);Serial.print('\t'); 
+    Serial.print("FI:");Serial.print(IR2.X);Serial.print('\t');
+    Serial.print("Lux:");Serial.print(LUX.X);Serial.print('\t');
+    Serial3.print("flora-visible=");   Serial3.print(VIS2.X);Serial3.print('\t'); 
+    Serial3.print("flora-infrared=");  Serial3.print(IR2.X);Serial3.print('\t');        
+    Serial3.print("flora-lux=");       Serial3.print(LUX.X);Serial3.print('\t');
     break;
     case 1:
-    Serial.print(FV);Serial.print(" ");
-    Serial.print(FI);Serial.print(" ");
-    Serial.print(FL);Serial.print(" ");
-    Serial3.print(FV);Serial3.print('\t'); 
-    Serial3.print(FI);Serial3.print('\t');        
-    Serial3.print(FL);Serial3.print('\t');
+    Serial.print(VIS2.X);Serial.print('\t');
+    Serial.print(IR2.X);Serial.print('\t');
+    Serial.print(LUX.X);Serial.print('\t');
+    Serial3.print(VIS2.X);Serial3.print('\t'); 
+    Serial3.print(IR2.X);Serial3.print('\t');        
+    Serial3.print(LUX.X);Serial3.print('\t');
     break;       
     }
 // SHT10
   if(Sh==0){SHT=000;SHH=000;}
   switch(mode){
     case 0:
-    Serial.print("SHT:");Serial.print(SHT);Serial.print(" ");
-    Serial.print("SHH:");Serial.print(SHH);Serial.print(" ");
-    Serial3.print("sht10-temp=");      Serial3.print(SHT);Serial3.print('\t');
-    Serial3.print("sht10-humidity=");  Serial3.print(SHH);Serial3.print('\t'); 
+    Serial.print("SHT:");Serial.print(TAIR.X);Serial.print('\t');
+    Serial.print("SHH:");Serial.print(HAIR.X);Serial.print('\t');
+    Serial3.print("sht10-temp=");      Serial3.print(TAIR.X);Serial3.print('\t');
+    Serial3.print("sht10-humidity=");  Serial3.print(HAIR.X);Serial3.print('\t'); 
     break;
     case 1:
-    Serial.print(SHT);Serial.print(" ");
-    Serial.print(SHH);Serial.print(" ");
-    Serial3.print(SHT);Serial3.print('\t');
-    Serial3.print(SHH);Serial3.print('\t');
+    Serial.print(TAIR.X);Serial.print('\t');
+    Serial.print(HAIR.X);Serial.print('\t');
+    Serial3.print(TAIR.X);Serial3.print('\t');
+    Serial3.print(HAIR.X);Serial3.print('\t');
     break; 
    }    
 // PT100
   if(Pt==0){TP1=00;TP2=00;}
   switch(mode){
   case 0:
-  Serial.print("TP1:");Serial.print(TP1); Serial.print(" ");
-  Serial.print("TP2:");Serial.print(TP2); Serial.print(" ");
-  Serial3.print("pt100-temp="); Serial3.print(TP1);Serial3.print('\t');
+  Serial.print("TP1:");Serial.print(PT100_1.X); Serial.print('\t');
+  Serial.print("TP2:");Serial.print(TP2); Serial.print('\t');
+  Serial3.print("pt100-temp="); Serial3.print(PT100_1.X);Serial3.print('\t');
   Serial3.print("pt100-temp="); Serial3.print(TP2);Serial3.print('\t');
   break;
   case 1:
-  Serial.print(TP1); Serial.print(" ");
-  Serial.print(TP2); Serial.print(" ");
-  Serial3.print(TP1);Serial3.print('\t');
+  Serial.print(PT100_1.X); Serial.print('\t');
+  Serial.print(TP2); Serial.print('\t');
+  Serial3.print(PT100_1.X);Serial3.print('\t');
   Serial3.print(TP2);Serial3.print('\t');
   break;  
   }
@@ -268,11 +357,11 @@ void PrintData(int mode){
   if(Ds==0){DS18=00;}
   switch(mode){
   case 0:
-    Serial.print("T-DS18:");Serial.print(DS18);Serial.print(" ");
+    Serial.print("T-DS18:");Serial.print(DS18);Serial.print('\t');
     Serial3.print("ds18b20-temp=");Serial3.print(DS18);Serial3.print('\t');
     break;
   case 1:
-    Serial.print(DS18);Serial.print(" ");
+    Serial.print(DS18);Serial.print('\t');
     Serial3.print(DS18);Serial3.print('\t');
     break;    
     }
@@ -280,23 +369,23 @@ void PrintData(int mode){
   if(Sw==0){SMP=00;}
   switch(mode){
   case 0:
-    Serial.print("200ss:");Serial.print(SMP);Serial.print(" ");
-    Serial3.print("200ss-humidity="); Serial3.print(SMP);Serial3.print('\t'); 
+    Serial.print("200ss:");Serial.print(SOILM.X);Serial.print('\t');
+    Serial3.print("200ss-SoilMoisture="); Serial3.print(SOILM.X);Serial3.print('\t'); 
     break;
   case 1:
-    Serial.print(SMP);Serial.print(" ");
-    Serial3.print(SMP);Serial3.print('\t'); 
+    Serial.print(SOILM.X);Serial.print('\t');
+    Serial3.print(SOILM.X);Serial3.print('\t'); 
     break;    
     }
 // Battery
   if(Bt==0){Bat=000;}
   switch(mode){
   case 0:
-    Serial.print("Batt:");Serial.print(Bat);Serial.print(" ");
+    Serial.print("Batt:");Serial.print(Bat);Serial.print('\t');
     Serial3.print("battery");Serial3.print(Bat);Serial3.print('\t');
     break; 
   case 1:
-    Serial.print(Bat);Serial.print(" ");
+    Serial.print(Bat);Serial.print('\t');
     Serial3.print(Bat);Serial3.print('\t');
     break; 
     }
@@ -304,11 +393,11 @@ void PrintData(int mode){
   if(Lf==0){Hj=000;}
   switch(mode){
   case 0:
-    Serial.print("LH:");Serial.print(Hj);Serial.print(" ");
+    Serial.print("LH:");Serial.print(Hj);Serial.print('\t');
     Serial3.print("leaf-humidity=");Serial3.print(Hj);Serial3.print('\t');
     break; 
   case 1:
-    Serial.print(Hj);Serial.print(" ");
+    Serial.print(Hj);Serial.print('\t');
     Serial3.print(Hj);Serial3.print('\t');
     break; 
   }
@@ -316,34 +405,29 @@ void PrintData(int mode){
   if(Lm==0){celsius=00.00;}
   switch(mode){
   case 0:
-    Serial.print("LM35:");Serial.println(celsius);
-    Serial3.print("lm35-temp=");Serial3.println(celsius);
+    Serial.print("LM35:");Serial.print('\t'); Serial.println(LM35.X);
+    
+    Serial3.print("lm35-temp=");Serial3.println(LM35.X);
     break; 
   case 1:
-    Serial.println(celsius);
-    Serial3.println(celsius);   
+    Serial.print(LM35.X);
+    Serial3.print(LM35.X);   
+    Serial.print('\t');
+    Serial.println(0);
     break;    
     }  
 }
 
-float AverageMeasurement(int Port,int K){
+float AverageMeasurement(int Port,int k){
   float Result=0,Val=0;
-  for(int i=1; i <= K; i++){
+  for(int i=1; i <= k; i++){
     Val = Val+analogRead(Port);
-    delay(10);   
+    delay(50);   
   }
-  Result=Val/K;return Result;
+  Result=Val/k;return Result;
 }
-void Filtro(float u, float meassurement){
-  float X,X_1,B,F,Q,P,K,H,R;
-  u=0; B=0;F=1;Q=1e-9;H=1;R=0.2090;
-  X=X*F+B*u;
-  P=F*P*F+Q;
-  K=P*H/(H*P*H+R);
-  X=X+K*(meassurement-H*X);
-  P=(1-K*H)*P;
-  //Serial.print(X), Serial.print(" ");
-}
+
+
 void SwON(){
   for (pin=0; pin<27; pin=pin+1){digitalWrite(Pines[pin],HIGH);}
 }

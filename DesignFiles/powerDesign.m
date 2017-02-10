@@ -6,7 +6,7 @@
 clear,clc,close all
 
 Vdc=5;
-Ih=0.35;
+Ih=0.6;
 iL=0.08;
 T=10*60;
 Th=5;
