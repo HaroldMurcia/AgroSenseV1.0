@@ -28,7 +28,7 @@ int Clk,Si,Fl,Sh,Pt,Ds,Bt,Lf,Lm,Sw;
 float DS18,SHT,SHH,SIU,res,P2,TP1,TP2,PT,millivolts,celsius,SMP;
 char  daysOfTheWeek[7][12]={"S","M","T","W","T","F","S"};
 float ElapsedTime,tic,toc;
-float const Ts=60000;
+float const Ts=600000;
 int Pines[]={2,3,4,5,6,7,8,9,10,23,24,25,26,27,29,30,31,32,33,34,35,37,46,50,52,53};
 float X,P; // Filtro
 
@@ -80,7 +80,7 @@ void loop(){
   Sht10();          //--->Sensor Tem,Hum
   Pt100();          //--->Sonda Pt100
 //  SondaDS18B20();   //--->Sonda Ds18B20  
-//  Battery();
+  Battery();
 //  Leaf(); 
   lm35(); 
   SoilWater(celsius);
@@ -120,12 +120,13 @@ void loop(){
   Filtro(FL,LUX.P,LUX.Q,LUX.R,LUX.X);
   LUX.P=P;LUX.X=X;
 
-  //pinMode(11,OUTPUT);
-  //digitalWrite(11,LOW);
-  //delay(60000);
+  pinMode(11,OUTPUT);
+  digitalWrite(11,LOW);
+  delay(500);
   PrintData(1);
-  //pinMode(11,INPUT);
-  //digitalWrite(11,HIGH);
+  delay(1000);
+  pinMode(11,INPUT);
+  digitalWrite(11,HIGH);
 
 //SampleTime measurement
   toc=millis();
@@ -406,12 +407,11 @@ void PrintData(int mode){
   switch(mode){
   case 0:
     Serial.print("LM35:");Serial.print('\t'); Serial.println(LM35.X);
-    
     Serial3.print("lm35-temp=");Serial3.println(LM35.X);
     break; 
   case 1:
     Serial.print(LM35.X);
-    Serial3.print(LM35.X);   
+    Serial3.println(LM35.X);   
     Serial.print('\t');
     Serial.println(0);
     break;    
