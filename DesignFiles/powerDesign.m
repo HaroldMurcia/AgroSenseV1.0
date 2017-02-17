@@ -20,4 +20,5 @@ Hs=6;       % Sun hours
 Hb=24-Hs;    
 securityNum=4;
 Ppanel=(Ec/Hs)*securityNum
-Pbatt=Ec/(Hb)
+n=(0.03*5)/(0.1*3.7);
+Pbatt=(Ec/(Hb))/n;

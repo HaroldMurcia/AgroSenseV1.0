@@ -15,6 +15,9 @@
 #include "SI114X.h"             //--->Sensor IF,UV,VIS
 #include "RTClib.h"             //--->Reloj
 #include "TSL2561.h"            //--->Flora Light
+#include <avr/sleep.h>
+#include <avr/power.h>
+#include <avr/wdt.h>
 
 //SoftwareSerial Xbee(15, 14);//(RX, TX)
 SI114X SI1145 = SI114X();    
@@ -22,7 +25,7 @@ SHT1x sht1x(41,39);             //----(dataPin, clockPin)
 RTC_DS1307 rtc;       
 TSL2561 tsl(TSL2561_ADDR_FLOAT);  
 OneWire oneWire_in(A5);DallasTemperature DS18B20(&oneWire_in); 
-
+volatile int f_wdt=1; // WathDogTImer
 int Anio,Mes,Dia,Hora,Min,FV,FI,FL,SIV,SII,V1,V2,PT1,PT2,Hj,Bat,pin,md;
 int Clk,Si,Fl,Sh,Pt,Ds,Bt,Lf,Lm,Sw;
 float DS18,SHT,SHH,SIU,res,P2,TP1,TP2,PT,millivolts,celsius,SMP;
@@ -31,7 +34,16 @@ float ElapsedTime,tic,toc;
 float const Ts=600000;
 int Pines[]={2,3,4,5,6,7,8,9,10,23,24,25,26,27,29,30,31,32,33,34,35,37,46,50,52,53};
 float X,P; // Filtro
-
+int long SleepCycles;
+// Watchdog Interrupt Service. This is executed when watchdog timed out.
+ISR(WDT_vect) {
+  if(f_wdt == 0) {
+    // here we can implement a counter the can set the f_wdt to true if
+    // the watchdog cycle needs to run longer than the maximum of eight
+    // seconds.
+    f_wdt=1;
+  }
+}
 
   struct DATA {
     float meassurement;
@@ -53,6 +65,73 @@ float X,P; // Filtro
   DATA LUX={0,1e3,0.5e-3,0.9818,0};
 
 
+///////////////////////////////////////////////
+// Enters the arduino into sleep mode.
+void enterSleep(void)
+{
+  // There are five different sleep modes in order of power saving:
+  // SLEEP_MODE_IDLE - the lowest power saving mode
+  // SLEEP_MODE_ADC
+  // SLEEP_MODE_PWR_SAVE
+  // SLEEP_MODE_STANDBY
+  // SLEEP_MODE_PWR_DOWN - the highest power saving mode
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
+
+  // Now enter sleep mode.
+  sleep_mode();
+
+  // The program will continue from here after the WDT timeout
+
+  // First thing to do is disable sleep.
+  sleep_disable();
+
+  // Re-enable the peripherals.
+  power_all_enable();
+}
+
+// Setup the Watch Dog Timer (WDT)
+void setupWatchDogTimer() {
+  // The MCU Status Register (MCUSR) is used to tell the cause of the last
+  // reset, such as brown-out reset, watchdog reset, etc.
+  // NOTE: for security reasons, there is a timed sequence for clearing the
+  // WDE and changing the time-out configuration. If you don't use this
+  // sequence properly, you'll get unexpected results.
+
+  // Clear the reset flag on the MCUSR, the WDRF bit (bit 3).
+  MCUSR &= ~(1<<WDRF);
+
+  // Configure the Watchdog timer Control Register (WDTCSR)
+  // The WDTCSR is used for configuring the time-out, mode of operation, etc
+
+  // In order to change WDE or the pre-scaler, we need to set WDCE (This will
+  // allow updates for 4 clock cycles).
+
+  // Set the WDCE bit (bit 4) and the WDE bit (bit 3) of the WDTCSR. The WDCE
+  // bit must be set in order to change WDE or the watchdog pre-scalers.
+  // Setting the WDCE bit will allow updates to the pre-scalers and WDE for 4
+  // clock cycles then it will be reset by hardware.
+  WDTCSR |= (1<<WDCE) | (1<<WDE);
+
+  /**
+   *  Setting the watchdog pre-scaler value with VCC = 5.0V and 16mHZ
+   *  WDP3 WDP2 WDP1 WDP0 | Number of WDT | Typical Time-out at Oscillator Cycles
+   *  0    0    0    0    |   2K cycles   | 16 ms
+   *  0    0    0    1    |   4K cycles   | 32 ms
+   *  0    0    1    0    |   8K cycles   | 64 ms
+   *  0    0    1    1    |  16K cycles   | 0.125 s
+   *  0    1    0    0    |  32K cycles   | 0.25 s
+   *  0    1    0    1    |  64K cycles   | 0.5 s
+   *  0    1    1    0    |  128K cycles  | 1.0 s
+   *  0    1    1    1    |  256K cycles  | 2.0 s
+   *  1    0    0    0    |  512K cycles  | 4.0 s
+   *  1    0    0    1    | 1024K cycles  | 8.0 s
+  */
+  WDTCSR  = (1<<WDP3) | (0<<WDP2) | (0<<WDP1) | (1<<WDP0);
+  // Enable the WD interrupt (note: no reset).
+  WDTCSR |= _BV(WDIE);
+}
+
 // Boton 32,34 - Leds 24,26
 //------------Main-----------------//
 void setup(){
@@ -63,6 +142,7 @@ void setup(){
   pinMode(11,INPUT);
   digitalWrite(11,HIGH); // Para ruido de Xbee primera vez
   md=0;
+  setupWatchDogTimer();  
 }
 
 
@@ -71,12 +151,18 @@ void setup(){
 
 void loop(){
   tic=millis();
+  
+  // Wait until the watchdog have triggered a wake up.
+  if(f_wdt != 1) {
+    return;
+  }
+  
  // Boton();
   SwON();
   delay(1000);
 //  Clock();        //--->Reloj
-  Si1145();       //--->Sensor IF,UV,VIS  
-  Flora();          //--->Sensor Flora  
+//  Si1145();       //--->Sensor IF,UV,VIS  
+//  Flora();          //--->Sensor Flora  
   Sht10();          //--->Sensor Tem,Hum
   Pt100();          //--->Sonda Pt100
 //  SondaDS18B20();   //--->Sonda Ds18B20  
@@ -127,14 +213,26 @@ void loop(){
   delay(1000);
   pinMode(11,INPUT);
   digitalWrite(11,HIGH);
-
-//SampleTime measurement
+  
+  //SampleTime measurement
+ 
   toc=millis();
-  ElapsedTime=(toc-tic);
-  while(ElapsedTime<Ts){
-    toc=millis();
-    ElapsedTime=(toc-tic);
+  //ElapsedTime=(toc-tic);
+  //SleepCycles=74; //para 10 min
+  SleepCycles=2;
+  
+  // clear the flag so we can run above code again after the MCU wake up
+  f_wdt = 0;
+  for (int i=0; i <= SleepCycles; i++){
+    enterSleep();
   }
+  
+  //while(ElapsedTime<Ts){
+  //  toc=millis();
+  //  ElapsedTime=(toc-tic);
+  //  Serial.println("HOLA");
+  //  enterSleep();
+  //}
   //Serial.print("dTime:");
  // Serial.println('\t');
  // Serial.println(ElapsedTime/1000.0);
@@ -229,8 +327,8 @@ void SoilWater(float T){
 void Battery(){
   Bt=1;
   float B_val=0; int k=10;
-  Bat=AverageMeasurement(9,k) ;
-  Bat = Bat/237.0*100;
+  Bat=AverageMeasurement(14,k) ;
+  Bat = Bat/757.0*100;
 }
 void Leaf(){
   Lf=1;
