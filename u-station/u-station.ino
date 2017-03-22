@@ -219,7 +219,7 @@ void loop(){
   toc=millis();
   //ElapsedTime=(toc-tic);
   //SleepCycles=74; //para 10 min
-  SleepCycles=2;
+  SleepCycles=8;
   
   // clear the flag so we can run above code again after the MCU wake up
   f_wdt = 0;
