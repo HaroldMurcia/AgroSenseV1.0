@@ -75,6 +75,8 @@ def InternetTest():
 #-------------------------------------------------------------------- MAIN
 if __name__ == "__main__":
     print('Iniciando... ')
+    os.system("sudo wvdial &")
+    time.sleep(20)
     fileText=time.strftime("%d-%m-%y")+'-'+time.strftime("%I-%M-%S")+".txt"
     print("Fichero: "+fileText)
     f = open(fileText,'w')
