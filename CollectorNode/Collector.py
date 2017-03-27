@@ -1,5 +1,4 @@
-# Universidad de Ibague
-# Research Group: SI2C
+# Universidad de Ibague# Research Group: SI2C
 # AgroSense
 
 import serial, time, datetime, requests,os,sys
@@ -13,20 +12,21 @@ from email.MIMEText import MIMEText
 Ts=60;       #Sample Time in Secs
 
 # internet test
-urlTest='http://www.google.com'
+urlTest='https://thingspeak.com'
 timeoutTest=5
 
 # Xbee Config
 Xbee=serial.Serial("/dev/ttyUSB0",baudrate=9600,timeout=700)
 Xbee.flushInput()
 dataXbee=''
+Ruta='/home/pi/Desktop/AgroSense/Data/'
 
 # Varaibles for ThingSpeak
 THINGSPEAKURL ='https://api.thingspeak.com/channels/105645'
 THINGSPEAKKEY ='VTI226PU2IPWWL30' 
 
 # Variables
-XbeeFail=0;dataXbee='0';ErrorMode=0;InternetFail=0;DataReport=0
+XbeeFail=0;dataXbee='0';ErrorMode=0; InternetFail=0; DataReport=0; StartReport=0
 
 def sendEmail(toaddr,subject,body,fileData):
 	msg = MIMEMultipart()
@@ -58,15 +58,19 @@ def ThingSpeak(KEY,d1,d2,d3,d4,d5,d6,d7,d8):
             print "Conection Failed"
 
 def InternetTest():
+    global InternetFail, StartReport
     try:
         _ = requests.get(urlTest, timeout=timeoutTest)
-        print("Internet ok")
+        print("Internet ok. \n")
         InternetFail=0
+        if(StartReport==0):
+            sendEmail('harold.murcia@unibague.edu.co','System State','System OK. \n'+'Date:'+time.strftime("%d-%m-%y")+'\t Time: '+time.strftime("%I-%M-%S"),'')
+            StartReport=1
     except requests.ConnectionError:
-        print("No internet")
-        print("-------------------------")
+        print("No internet. \n")
+        print("-------------------------------")
         InternetFail=InternetFail+1
-        if(IntenernetFail>120):
+        if(InternetFail>120):
             ErrorMode=2
             InternetFail=0
             print "Reboot"
@@ -74,17 +78,18 @@ def InternetTest():
             os.system("sudo reboot")
 #-------------------------------------------------------------------- MAIN
 if __name__ == "__main__":
-    print('Iniciando... ')
+    print('Inicializando Sistema...\n ')
+    time.sleep(10)
     os.system("sudo wvdial &")
-    time.sleep(20)
-    fileText=time.strftime("%d-%m-%y")+'-'+time.strftime("%I-%M-%S")+".txt"
-    print("Fichero: "+fileText)
+    time.sleep(10)
+    fileText=Ruta+time.strftime("%d-%m-%y")+'-'+time.strftime("%I-%M-%S")+".txt"
+    print("Fichero: "+fileText+"\n")
     f = open(fileText,'w')
     f.close()
     InternetTest()
-    if(InternetFail==0):
-        sendEmail('harold.murcia@unibague.edu.co','System State','System OK','')
     while True:
+	print("Working \n")
+	InternetTest()
         f = open(fileText,"a") #opens file with name of "test.txt"
         Tic=time.time()
         try:
@@ -114,8 +119,8 @@ if __name__ == "__main__":
         print('N: '+str(N))
         print ('Data: '+str(data))
         try:
-            if(N>19):
-                ThingSpeak(THINGSPEAKKEY,data[17],data[9],data[10],data[11],data[12],data[13],data[19],data[16])
+            if(N>14):
+                ThingSpeak(THINGSPEAKKEY,data[13],data[1],data[5],data[6],data[7],data[8],data[10],data[11])
         except:
             print('Error uploading Data')
         Toc=time.strftime("%I-%M-%S")
@@ -124,11 +129,13 @@ if __name__ == "__main__":
         Minutes=float(Toc[1])
         if(Hour!=0):
             DataReport=0
-        if(Hour==0 and Minutes>0 and Minutes<30 and DataReport==0):
-            DataReport=1
+        if(Hour==0 and Minutes>0 and Minutes<20 and DataReport==0):
             f.close()
-            sendEmail('harold.murcia@unibague.edu.co','Report','This is the data report',fileText)
-            fileText=time.strftime("%d-%m-%y")+'-'+time.strftime("%I-%M-%S")+".txt"
+            if(InternetFail==0):
+		filetextR=fileText
+                sendEmail('harold.murcia@unibague.edu.co','Report','This is the data report. ',fileTextR)
+		DataReport=1
+            fileText=Ruta+time.strftime("%d-%m-%y")+'-'+time.strftime("%I-%M-%S")+".txt"
             print("Fichero: "+fileText)
             f = open(fileText,'w')
             f.close()

@@ -161,11 +161,11 @@ void loop(){
   SwON();
   delay(1000);
 //  Clock();        //--->Reloj
-//  Si1145();       //--->Sensor IF,UV,VIS  
+  Si1145();       //--->Sensor IF,UV,VIS  
 //  Flora();          //--->Sensor Flora  
   Sht10();          //--->Sensor Tem,Hum
   Pt100();          //--->Sonda Pt100
-//  SondaDS18B20();   //--->Sonda Ds18B20  
+  SondaDS18B20();   //--->Sonda Ds18B20  
   Battery();
 //  Leaf(); 
   lm35(); 
