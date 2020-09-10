@@ -15,8 +15,14 @@ The information package is labeled according to the station and variable, then i
 
 ## Related documents
 * [Murcia-Moreno, H., González-Quintero, B., & López-Gaona, J. (2017, November). An online learning method for embedded decision support in agriculture irrigation. In International Conference of ICT for Adapting Agriculture to Climate Change (pp. 234-249). Springer, Cham.](https://link.springer.com/chapter/10.1007/978-3-319-70187-5_18)
-* Towards the connection of agriculture with the internet of  things in Colombian farms
+* [Towards the connection of agriculture with the internet of  things in Colombian farms](https://github.com/HaroldMurcia/AgroSense/blob/master/Eventos/Murcia_TOWARDS%20THE%20CONNECTION%20OF%20AGRICULTURE%20WITH%20THE%20INTERNET%20OF%20THINGS%20IN%20COLOMBIAN%20FARMS%20.pdf)
 * [Jiménez Tovar, D.J. (2019). Aprendizaje automático para toma decisiones en aplicaciones de riego inteligente. Tesis de pregrado en Ingeniería Electrónica. Universidad de Ibagué, Tolima, Colombia](https://repositorio.unibague.edu.co/jspui/bitstream/20.500.12313/1308/1/Trabajo%20de%20grado.pdf)
+
+## Related videos
+[![Agrosensor](https://sites.google.com/a/unibague.edu.co/si2c/_/rsrc/1498445005827/species-description/AgroS.004.jpg)](https://www.youtube.com/watch?v=UN_PwREh9Nc&feature=emb_logo)
+
+
+[![AgroSense](https://sites.google.com/a/unibague.edu.co/si2c/_/rsrc/1498445094765/species-description/Screen%20Shot%202017-06-25%20at%209.43.59%20PM.png?height=266&width=400)](https://www.youtube.com/watch?v=Ysgb1RF3knw&feature=emb_logo)
 
 ## Other repositories
 * [Smart AgroSensor for Irrigation Applications](https://github.com/HaroldMurcia/smartAgroS)
